@@ -2,7 +2,7 @@
 Générateur de données synthétiques pour le Détecteur Intelligent de Causes Racines.
 
 Produit deux fichiers :
-    1. training_data.csv     -> dataset supervisé (log_block, root_cause_index)
+    1. training_data..csv     -> dataset supervisé (log_block, root_cause_index)
     2. demo_production.log   -> flux de logs réaliste pour la démo Web
 
 Usage :
@@ -201,7 +201,7 @@ def generate_training_csv(path: str, n_blocks: int = 5000) -> None:
     rows = [generate_training_block() for _ in range(n_blocks)]
     df = pd.DataFrame(rows, columns=["log_block", "root_cause_index"])
     df.to_csv(path, index=False, quoting=csv.QUOTE_ALL, encoding="utf-8")
-    print(f"[OK] training_data.csv -> {len(df)} blocs ({(df['root_cause_index']>=0).sum()} avec anomalie)")
+    print(f"[OK] training_data..csv -> {len(df)} blocs ({(df['root_cause_index']>=0).sum()} avec anomalie)")
 
 
 # ---------------------------------------------------------------------------
