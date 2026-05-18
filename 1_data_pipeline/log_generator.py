@@ -2,8 +2,8 @@
 Générateur de données synthétiques pour le Détecteur Intelligent de Causes Racines.
 
 Produit deux fichiers :
-    1. training_data..csv     -> dataset supervisé (log_block, root_cause_index)
-    2. demo_production.log   -> flux de logs réaliste pour la démo Web
+    1. training_data.csv     -> dataset supervisé (log_block, root_cause_index)
+    2. Un lot de fichiers de logs pour la démo Web (format: log_ddMMyyyyhh:mm.log)
 
 Usage :
     python log_generator.py
@@ -33,7 +33,6 @@ USERS = ["j.doe@domain.com", "s.smith@domain.com", "admin@domain.com",
 # ---------------------------------------------------------------------------
 # 2. LOGS "NORMAUX" (bruit de fond)
 # ---------------------------------------------------------------------------
-# Chaque entrée = (module, level, event, message_template)
 NORMAL_LOGS = [
     ("SYS",    "INFO",    "Cache Refresh",            "General system operation executed successfully."),
     ("SYS",    "INFO",    "Health Check",             "All endpoints reported 200 OK. Latency: {lat}ms."),
@@ -56,10 +55,6 @@ NORMAL_LOGS = [
 # ---------------------------------------------------------------------------
 # 3. SCÉNARIOS D'ANOMALIES (CASCADES)
 # ---------------------------------------------------------------------------
-# Chaque cascade = liste ORDONNÉE de logs.
-# L'ÉLÉMENT 0 = la CAUSE RACINE. Les éléments suivants = conséquences.
-# Pour ajouter une cascade : append un nouveau dict ici. Aucun autre changement requis.
-
 ANOMALY_SCENARIOS = [
     {
         "name": "DB_TIMEOUT_CASCADE",
@@ -114,7 +109,6 @@ ANOMALY_SCENARIOS = [
 # ---------------------------------------------------------------------------
 
 def _fill_template(message: str) -> str:
-    """Remplit les placeholders {lat}, {n}, {user}, {rid}, {ms} avec des valeurs aléatoires."""
     return message.format(
         lat=random.randint(50, 8000),
         n=random.randint(10, 500),
@@ -125,7 +119,6 @@ def _fill_template(message: str) -> str:
 
 
 def _format_line(ts: datetime, module: str, level: str, event: str, message: str) -> str:
-    """Formate une ligne au format : DD-MM-YYYY-HH:MM | MODULE | LEVEL | Event | Message"""
     ts_str = ts.strftime("%d-%m-%Y-%H:%M")
     return f"{ts_str} | {module} | {level} | {event} | {_fill_template(message)}"
 
@@ -136,7 +129,6 @@ def _make_normal_line(ts: datetime) -> str:
 
 
 def _make_cascade_lines(start_ts: datetime, scenario: dict) -> list[str]:
-    """Sérialise une cascade : les étapes se suivent dans la minute / quelques minutes."""
     lines = []
     ts = start_ts
     for module, level, event, msg in scenario["steps"]:
@@ -150,46 +142,23 @@ def _make_cascade_lines(start_ts: datetime, scenario: dict) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def generate_training_block(block_size: int = 15, anomaly_proba: float = 0.5) -> tuple[str, int]:
-    """
-    Construit UN bloc de logs et calcule root_cause_index.
-
-    Mathématique du root_cause_index :
-        - On crée d'abord 'block_size' lignes de bruit.
-        - Si une cascade est injectée, on choisit un index 'insert_pos' aléatoire
-          dans [0, block_size - len(cascade)] : c'est la position EXACTE de la
-          CAUSE RACINE dans le bloc final (la 1ère étape de la cascade).
-        - Les étapes suivantes de la cascade REMPLACENT les lignes de bruit
-          aux positions insert_pos+1, insert_pos+2, ... (on ne shift pas, sinon
-          l'index ne correspondrait plus). On garde donc un bloc de taille fixe.
-        - root_cause_index = insert_pos  (l'index 0-based de la cause racine).
-        - Si pas de cascade injectée -> root_cause_index = -1.
-    """
     base_ts = datetime(2026, 5, 11, 8, 0) + timedelta(minutes=random.randint(0, 600))
-
-    # 1) Bloc de bruit (taille fixe = block_size)
     lines = []
     for i in range(block_size):
         lines.append(_make_normal_line(base_ts + timedelta(seconds=i * random.randint(20, 80))))
 
-    # 2) Décide d'injecter ou non une cascade
     if random.random() < anomaly_proba:
         scenario = random.choice(ANOMALY_SCENARIOS)
         cascade = _make_cascade_lines(base_ts + timedelta(minutes=random.randint(1, 5)),
                                       scenario)
-
-        # On s'assure que la cascade entière tient dans le bloc.
         max_start = block_size - len(cascade)
         if max_start < 0:
-            # Cascade plus longue que le bloc : on tronque la cascade.
             cascade = cascade[:block_size]
             max_start = 0
 
         insert_pos = random.randint(0, max_start)
-
-        # Remplacement en place -> l'index de la CAUSE RACINE = insert_pos
         for offset, cline in enumerate(cascade):
             lines[insert_pos + offset] = cline
-
         root_cause_index = insert_pos
     else:
         root_cause_index = -1
@@ -201,20 +170,20 @@ def generate_training_csv(path: str, n_blocks: int = 5000) -> None:
     rows = [generate_training_block() for _ in range(n_blocks)]
     df = pd.DataFrame(rows, columns=["log_block", "root_cause_index"])
     df.to_csv(path, index=False, quoting=csv.QUOTE_ALL, encoding="utf-8")
-    print(f"[OK] training_data..csv -> {len(df)} blocs ({(df['root_cause_index']>=0).sum()} avec anomalie)")
+    print(f"[OK] training_data.csv -> {len(df)} blocs ({(df['root_cause_index']>=0).sum()} avec anomalie)")
 
 
 # ---------------------------------------------------------------------------
 # 6. GÉNÉRATION DU FLUX DE DÉMO
 # ---------------------------------------------------------------------------
 
-def generate_demo_log(path: str, n_lines: int = 500, n_cascades: int = 4) -> None:
-    """Produit une chronologie continue avec quelques cascades cachées."""
-    start = datetime(2026, 5, 11, 8, 0)
+def generate_demo_log(path: str, n_lines: int = 500, n_cascades: int = 4, start_time: datetime = None) -> None:
+    if start_time is None:
+        start_time = datetime.now()
+        
     lines: list[str] = []
-    ts = start
+    ts = start_time
 
-    # 1) Choisir les positions des cascades (réparties dans le flux)
     cascade_positions = sorted(random.sample(range(20, n_lines - 20), n_cascades))
     cascade_iter = iter(cascade_positions)
     next_cascade_at = next(cascade_iter, None)
@@ -238,19 +207,25 @@ def generate_demo_log(path: str, n_lines: int = 500, n_cascades: int = 4) -> Non
     print(f"[OK] {path} -> {min(len(lines), n_lines)} lignes, {n_cascades} cascades cachées")
 
 
-RELEASE_BATCH = [
-    ("logs_release_v1.0.log", 12),
-    ("logs_release_v1.1.log", 8),
-    ("logs_release_v1.2.log", 14),
-    ("logs_release_v2.0.log", 3),
-    ("logs_release_v2.1.log", 1),
-]
-
-
-def generate_release_batch(batch: list[tuple[str, int]], n_lines: int = 500) -> None:
-    for filename, n_cascades in batch:
-        generate_demo_log(filename, n_lines=n_lines, n_cascades=n_cascades)
-
+def generate_large_release_batch(n_files: int = 30, n_lines: int = 500) -> None:
+    """
+    Génère un grand nombre de fichiers de logs avec des noms basés sur des horodatages.
+    Le nombre d'anomalies varie de manière aléatoire pour simuler différentes conditions de production.
+    """
+    base_date = datetime(2026, 5, 11, 8, 0)
+    
+    for i in range(n_files):
+        # On incrémente la date de quelques heures pour chaque fichier
+        current_date = base_date + timedelta(hours=i * random.randint(4, 24))
+        
+        # Format du nom de fichier : log_ddMMyyyyhh:mm.log (Remplacement des ":" illégaux sous Windows par "-")
+        # Note: ":" n'est pas autorisé dans les noms de fichiers sous Windows, on utilise "-" à la place
+        filename = current_date.strftime("log_%d%m%Y%H-%M.log")
+        
+        # On choisit un nombre aléatoire de cascades entre 1 et 15 pour simuler une variance de stabilité
+        n_cascades = random.randint(1, 15)
+        
+        generate_demo_log(filename, n_lines=n_lines, n_cascades=n_cascades, start_time=current_date)
 
 # ---------------------------------------------------------------------------
 # 7. ENTRÉE PRINCIPALE
@@ -259,5 +234,7 @@ def generate_release_batch(batch: list[tuple[str, int]], n_lines: int = 500) -> 
 if __name__ == "__main__":
     random.seed(42)
     generate_training_csv("training_data.csv", n_blocks=5000)
-    generate_release_batch(RELEASE_BATCH, n_lines=500)
+    
+    generate_large_release_batch(n_files=30, n_lines=500)
+    
     print("Done.")
