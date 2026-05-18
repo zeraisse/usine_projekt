@@ -235,7 +235,21 @@ def generate_demo_log(path: str, n_lines: int = 500, n_cascades: int = 4) -> Non
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines[:n_lines]))
-    print(f"[OK] demo_production.log -> {min(len(lines), n_lines)} lignes, {n_cascades} cascades cachées")
+    print(f"[OK] {path} -> {min(len(lines), n_lines)} lignes, {n_cascades} cascades cachées")
+
+
+RELEASE_BATCH = [
+    ("logs_release_v1.0.log", 12),
+    ("logs_release_v1.1.log", 8),
+    ("logs_release_v1.2.log", 14),
+    ("logs_release_v2.0.log", 3),
+    ("logs_release_v2.1.log", 1),
+]
+
+
+def generate_release_batch(batch: list[tuple[str, int]], n_lines: int = 500) -> None:
+    for filename, n_cascades in batch:
+        generate_demo_log(filename, n_lines=n_lines, n_cascades=n_cascades)
 
 
 # ---------------------------------------------------------------------------
@@ -245,5 +259,5 @@ def generate_demo_log(path: str, n_lines: int = 500, n_cascades: int = 4) -> Non
 if __name__ == "__main__":
     random.seed(42)
     generate_training_csv("training_data.csv", n_blocks=5000)
-    generate_demo_log("demo_production.log", n_lines=500, n_cascades=4)
+    generate_release_batch(RELEASE_BATCH, n_lines=500)
     print("Done.")
