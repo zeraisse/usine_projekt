@@ -27,7 +27,6 @@ st.markdown("---")
 
 with st.sidebar:
     st.header("Ingestion des données")
-    # MODIFICATION : accept_multiple_files=True
     uploaded_files = st.file_uploader(
         "Déposez les fichiers de logs (ex: jours ou releases successives)", 
         type=["log", "txt"], 
@@ -48,7 +47,7 @@ if uploaded_files:
         total_lignes = len(lignes_logs)
         erreurs_brutes = sum(1 for ligne in lignes_logs if "ERROR" in ligne)
         
-        # Analyse IA (Comptage des vraies cascades)
+        # Analyse IA
         cascades_ia = 0
         if ia_ready:
             index_erreurs = [i for i, ligne in enumerate(lignes_logs) if "ERROR" in ligne]
