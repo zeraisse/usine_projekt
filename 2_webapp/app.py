@@ -104,10 +104,10 @@ if uploaded_files:
         
     st.markdown("---")
 
-    # --- NOUVELLE SECTION : VALEUR MÉTIER & DIAGNOSTIC ---
+    # VALEUR MÉTIER & DIAGNOSTIC ---
     st.subheader("Diagnostic IA & Réduction du Bruit")
     
-    col3, col4 = st.columns([1, 2]) # La colonne 4 est plus large pour le tableau
+    col3, col4 = st.columns([1, 2])
     
     with col3:
         total_erreurs_brutes = df_kpi["Erreurs brutes (Bruit)"].sum()
