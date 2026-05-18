@@ -3,25 +3,28 @@ import pickle
 import os
 import sys
 
-# On s'assure que le script trouve model_utils et train_trm
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from model_utils import LogTokenizer
 from train_trm import TinyRecursiveModel
 
 class TRMInferenceWorker:
-    def __init__(self, model_path="trm_model.pt", tokenizer_path="tokenizer.pkl"):
+    def __init__(self, model_filename="trm_model.pt", tokenizer_filename="tokenizer.pkl"):
         """Initialise le worker en chargeant le cerveau gelé en mémoire."""
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # 1. Charger le Dictionnaire
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        model_filename = os.path.join(base_dir, model_filename)
+        tokenizer_filename = os.path.join(base_dir, tokenizer_filename)
+        
         try:
-            with open(tokenizer_path, "rb") as f:
+            with open(tokenizer_filename, "rb") as f:
                 self.tokenizer = pickle.load(f)
         except FileNotFoundError:
             raise Exception("Erreur : tokenizer.pkl introuvable. As-tu lancé l'entraînement ?")
 
-        # 2. Charger le Modèle (Mêmes dimensions que l'entraînement)
+    
         self.model = TinyRecursiveModel(
             vocab_size=5000, 
             embed_dim=64, 
@@ -30,7 +33,7 @@ class TRMInferenceWorker:
         ).to(self.device)
         
         try:
-            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+            self.model.load_state_dict(torch.load(model_filename, map_location=self.device))
         except FileNotFoundError:
             raise Exception("Erreur : trm_model.pt introuvable. As-tu lancé l'entraînement ?")
             
@@ -48,7 +51,6 @@ class TRMInferenceWorker:
             
         return predicted_index
 
-# --- TEST EN ISOLÉ ---
 if __name__ == "__main__":
     # Ce bloc ne s'exécute que si on lance le worker.py
     worker = TRMInferenceWorker()
