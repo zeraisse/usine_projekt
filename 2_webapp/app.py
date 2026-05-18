@@ -3,11 +3,17 @@ import pandas as pd
 import sys
 import os
 
-sys.path.append(os.path.abspath('../3_ai_engine'))
+dossier_actuel = os.path.dirname(os.path.abspath(__file__))
+dossier_ai = os.path.abspath(os.path.join(dossier_actuel, '../3_ai_engine'))
+
+if dossier_ai not in sys.path:
+    sys.path.append(dossier_ai)
+
 try:
     from worker import TRMInferenceWorker
-except ImportError:
-    st.error("Impossible de trouver le module IA. Vérifiez l'arborescence.")
+except ImportError as e:
+    st.error(f"Erreur critique d'importation du module IA : {e}")
+    st.stop() 
 
 st.set_page_config(page_title="Dashboard KPI Usine", layout="wide")
 
