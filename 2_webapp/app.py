@@ -95,42 +95,41 @@ if uploaded_files:
     
     st.subheader("Synthèse Globale")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total Fichiers Analysés", len(uploaded_files))
     with col2:
+        total_erreurs_brutes = df_kpi["Erreurs brutes (Bruit)"].sum()
+        st.metric("Erreurs Logs (Texte Brut)", total_erreurs_brutes)
+    with col3:
         total_cascades = df_kpi["Cascades critiques (IA)"].sum()
-        st.metric("Pannes Critiques Détectées (Total)", total_cascades)
+        bruit_supprime = total_erreurs_brutes - total_cascades
+        # Affiche le nombre de vraies pannes, avec la quantité de bruit supprimé en dessous
+        st.metric("Vraies Pannes (Root Causes)", total_cascades, delta=f"- {bruit_supprime} alertes inutiles", delta_color="inverse")
         
     st.markdown("---")
 
-    # VALEUR MÉTIER & DIAGNOSTIC ---
+    # --- VALEUR MÉTIER & DIAGNOSTIC ---
     st.subheader("Diagnostic IA & Réduction du Bruit")
     
-    col3, col4 = st.columns([1, 2])
+    col4, col5 = st.columns([1, 2])
     
-    with col3:
-        total_erreurs_brutes = df_kpi["Erreurs brutes (Bruit)"].sum()
-        bruit_supprime = total_erreurs_brutes - total_cascades
-        taux_reduction_bruit = (bruit_supprime / total_erreurs_brutes * 100) if total_erreurs_brutes > 0 else 0
-        
-        st.metric("Bruit Filtré par l'IA", f"{taux_reduction_bruit:.1f} %", delta="Fausses alertes ignorées")
-
     with col4:
+        taux_reduction_bruit = (bruit_supprime / total_erreurs_brutes * 100) if total_erreurs_brutes > 0 else 0
+        st.metric("Bruit Filtré par l'IA", f"{taux_reduction_bruit:.1f} %")
+
+    with col5:
         st.markdown("**Palmarès des Causes Racines Identifiées :**")
         if toutes_causes_racines:
-            # On compte les occurrences de chaque type de panne
             compte_causes = Counter(toutes_causes_racines)
             df_causes = pd.DataFrame(compte_causes.items(), columns=["Type de Panne Critique (Root Cause)", "Occurrences"])
             df_causes = df_causes.sort_values(by="Occurrences", ascending=False).reset_index(drop=True)
             
-            # Affichage propre d'un petit tableau
             st.dataframe(df_causes, use_container_width=True, hide_index=True)
         else:
             st.info("Aucune panne critique détectée dans ces logs.")
 
     st.markdown("---")
-    
     # --- GRAPHIQUES DE TENDANCE ---
     st.subheader("Évolution de la stabilité par Release")
     
