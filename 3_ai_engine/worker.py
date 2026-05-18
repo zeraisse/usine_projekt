@@ -29,7 +29,7 @@ class TRMInferenceWorker:
             vocab_size=5000, 
             embed_dim=64, 
             hidden_dim=128, 
-            max_lines_per_block=10
+            max_lines_per_block=16
         ).to(self.device)
         
         try:
